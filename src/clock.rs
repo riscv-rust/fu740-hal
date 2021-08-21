@@ -1,5 +1,5 @@
-use crate::time::Hertz;
 use crate::pac::PRCI;
+use crate::time::Hertz;
 
 const HFXCLK: u32 = 26_000_000;
 
@@ -9,9 +9,7 @@ pub trait PrciExt {
 
 impl PrciExt for PRCI {
     fn setup(self) -> ClockSetup {
-        ClockSetup {
-            prci: self,
-        }
+        ClockSetup { prci: self }
     }
 }
 
@@ -22,14 +20,12 @@ pub struct ClockSetup {
 
 impl ClockSetup {
     pub fn freeze(self) -> Clocks {
-        Clocks {
-            coreclk: HFXCLK
-        }
+        Clocks { coreclk: HFXCLK }
     }
 }
 
 pub struct Clocks {
-    coreclk: u32
+    coreclk: u32,
 }
 
 impl Clocks {

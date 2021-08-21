@@ -1,18 +1,18 @@
-use embedded_hal::blocking::delay::{DelayUs, DelayMs};
 use crate::clock::Clocks;
+use embedded_hal::blocking::delay::{DelayMs, DelayUs};
 use riscv::register::mcycle;
 
 /// Machine mode cycle counter (`mcycle`) as a delay provider
 #[derive(Copy, Clone)]
 pub struct McycleDelay {
-    core_frequency: u32
+    core_frequency: u32,
 }
 
 impl McycleDelay {
     /// Constructs the delay provider
     pub fn new(clocks: &Clocks) -> Self {
         Self {
-            core_frequency: clocks.coreclk().0
+            core_frequency: clocks.coreclk().0,
         }
     }
 }
@@ -21,7 +21,7 @@ impl DelayUs<u64> for McycleDelay {
     fn delay_us(&mut self, us: u64) {
         let t0 = mcycle::read64();
         let clocks = (us * (self.core_frequency as u64)) / 1_000_000;
-        while mcycle::read64().wrapping_sub(t0) <= clocks { }
+        while mcycle::read64().wrapping_sub(t0) <= clocks {}
     }
 }
 
