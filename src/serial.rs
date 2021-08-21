@@ -38,7 +38,7 @@ pub struct Tx<UART> {
 impl<UART: UartX> Serial<UART> {
     /// Configures a UART peripheral to provide serial communication
     pub fn new(uart: UART, baud_rate: Bps, clocks: &Clocks) -> Self {
-        let div = clocks.tlclk().0 / baud_rate.0 - 1;
+        let div = clocks.pclk().0 / baud_rate.0 - 1;
         assert!(div <= 0xffff);
         unsafe {
             uart.ie.modify(|_, w| {
