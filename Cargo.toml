@@ -5,3 +5,5 @@ edition = "2018"
 
 [dependencies]
 fu740-pac = { path = "../fu740-pac" }
+embedded-hal = { version = "0.2.3", features = ["unproven"] }
+riscv = "0.7.0"
