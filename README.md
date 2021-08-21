@@ -4,7 +4,7 @@
 
 # `fu740-hal`
 
-> Peripheral access API for FU740 SoC
+> HAL for FU740 SoC
 
 This project is developed and maintained by the [RISC-V team][team].
 
