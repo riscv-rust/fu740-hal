@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 edition = "2018"
 
 [dependencies]
-fu740-pac = { path = "../fu740-pac" }
+fu740-pac = { git = "https://github.com/riscv-rust/fu740-pac.git", rev = "31e54b10d4634976c28e32796f679a347b657f35" }
 embedded-hal = { version = "0.2.3", features = ["unproven"] }
 nb = "0.1.2"
 riscv = "0.7.0"
