@@ -1,0 +1,7 @@
+[package]
+name = "fu740-hal"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+fu740-pac = { path = "../fu740-pac" }
