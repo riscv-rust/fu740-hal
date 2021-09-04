@@ -12,6 +12,7 @@ impl PrciExt for PRCI {
         ClockSetup {
             prci: self,
             coreclk: None,
+            pclk: None,
         }
     }
 }
@@ -105,6 +106,7 @@ impl PLLConfig {
 pub struct ClockSetup {
     prci: PRCI,
     coreclk: Option<u32>,
+    pclk: Option<u32>,
 }
 
 impl ClockSetup {
@@ -116,13 +118,23 @@ impl ClockSetup {
         self
     }
 
+    pub fn pclk<F: Into<Hertz>>(mut self, freq: F) -> Self {
+        let freq = freq.into().0;
+        assert!(freq < 125_000_000);
+
+        self.pclk = Some(freq);
+        self
+    }
+
     pub fn freeze(self) -> Clocks {
         let coreclk = self.coreclk.unwrap_or(HFXCLK);
+        let pclk = self.pclk.unwrap_or(HFXCLK / 2);
 
         let core_pll = PLLConfig::calculate(HFXCLK, coreclk).unwrap();
+        let hfpclk_pll = PLLConfig::calculate(HFXCLK, pclk * 2).unwrap();
 
         unsafe {
-            // Switch to HFXCLK
+            // Switch core clock to HFXCLK
             self.prci
                 .core_clk_sel_reg
                 .modify(|r, w| w.bits(r.bits() | 1));
@@ -151,11 +163,42 @@ impl ClockSetup {
                     .core_clk_sel_reg
                     .modify(|r, w| w.bits(r.bits() & !1));
             }
+
+            // Switch peripheral clock to HFXCLK
+            self.prci.hfpclkpllsel.modify(|r, w| w.bits(r.bits() | 1));
+
+            // Apply PLL configuration
+            self.prci.hfpclk_pllcfg.write_with_zero(|w| {
+                w.pllr().bits(hfpclk_pll.r);
+                w.pllf().bits(hfpclk_pll.f);
+                w.pllq().bits(hfpclk_pll.q);
+                w.pllrange().bits(hfpclk_pll.range);
+                w.pllbypass().bit(hfpclk_pll.bypass);
+                w.pllfsebypass().set_bit()
+            });
+
+            if !hfpclk_pll.bypass {
+                // Wait for lock
+                while self.prci.hfpclk_pllcfg.read().plllock().bit_is_clear() {}
+            }
+
+            // Enable clock
+            self.prci
+                .hfpclk_plloutdiv
+                .modify(|r, w| w.bits(r.bits() | 1u32 << 31));
+
+            if pclk != HFXCLK / 2 {
+                // Select PLL as a peripheral clock source
+                self.prci.hfpclkpllsel.modify(|r, w| w.bits(r.bits() & !1));
+            }
+
+            // Set divider to 0 (divide by 2)
+            self.prci.hfpclk_div_reg.write_with_zero(|w| w.bits(0));
         }
 
         Clocks {
             coreclk: core_pll.output_frequency(HFXCLK),
-            pclk: HFXCLK / 2,
+            pclk: hfpclk_pll.output_frequency(HFXCLK) / 2,
         }
     }
 }
