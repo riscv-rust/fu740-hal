@@ -1,7 +1,9 @@
-use crate::pac::PRCI;
-use crate::time::Hertz;
+use crate::{pac::PRCI, time::Hertz};
 
 const HFXCLK: u32 = 26_000_000;
+const HFXCLK_SOURCE: u32 = 1;
+const DVFSCOREPLL_SOURCE: u32 = 1;
+const HFPCLKPLL: u32 = 1;
 
 pub trait PrciExt {
     fn setup(self) -> ClockSetup;
@@ -38,10 +40,10 @@ impl PLLConfig {
         }
 
         let divq: u8 = match output {
-            f if f > 2400_000_000 => {
+            f if f > 2_400_000_000 => {
                 return Err("Requested PLL output frequency is too high");
             }
-            f if f >= 1200_000_000 => 1,
+            f if f >= 1_200_000_000 => 1,
             f if f >= 600_000_000 => 2,
             f if f >= 300_000_000 => 3,
             f if f >= 150_000_000 => 4,
@@ -56,7 +58,7 @@ impl PLLConfig {
         let divr = (0..3)
             .min_by_key(|divr| {
                 let pllin = input / (divr + 1);
-                if pllin < 7_000_000 || pllin >= 200_000_000 {
+                if !(7_000_000..200_000_000).contains(&pllin) {
                     i64::MAX
                 } else {
                     let f1 = vco / (2 * pllin as u64);
@@ -112,7 +114,7 @@ pub struct ClockSetup {
 impl ClockSetup {
     pub fn coreclk<F: Into<Hertz>>(mut self, freq: F) -> Self {
         let freq = freq.into().0;
-        assert!(freq < 1600_000_000);
+        assert!(freq < 1_600_000_000);
 
         self.coreclk = Some(freq);
         self
@@ -137,7 +139,7 @@ impl ClockSetup {
             // Switch core clock to HFXCLK
             self.prci
                 .core_clk_sel_reg
-                .modify(|r, w| w.bits(r.bits() | 1));
+                .modify(|r, w| w.bits(r.bits() | HFXCLK_SOURCE));
 
             // Apply PLL configuration
             self.prci.core_pllcfg.write_with_zero(|w| {
@@ -154,18 +156,22 @@ impl ClockSetup {
                 while self.prci.core_pllcfg.read().plllock().bit_is_clear() {}
 
                 // Select corepll
-                self.prci.corepllsel.modify(|r, w| w.bits(r.bits() & !1));
+                self.prci
+                    .corepllsel
+                    .modify(|r, w| w.bits(r.bits() & !DVFSCOREPLL_SOURCE));
             }
 
             if coreclk != HFXCLK {
                 // Select PLL as a core clock source
                 self.prci
                     .core_clk_sel_reg
-                    .modify(|r, w| w.bits(r.bits() & !1));
+                    .modify(|r, w| w.bits(r.bits() & !HFXCLK_SOURCE));
             }
 
             // Switch peripheral clock to HFXCLK
-            self.prci.hfpclkpllsel.modify(|r, w| w.bits(r.bits() | 1));
+            self.prci
+                .hfpclkpllsel
+                .modify(|r, w| w.bits(r.bits() | HFPCLKPLL));
 
             // Apply PLL configuration
             self.prci.hfpclk_pllcfg.write_with_zero(|w| {
@@ -189,7 +195,9 @@ impl ClockSetup {
 
             if pclk != HFXCLK / 2 {
                 // Select PLL as a peripheral clock source
-                self.prci.hfpclkpllsel.modify(|r, w| w.bits(r.bits() & !1));
+                self.prci
+                    .hfpclkpllsel
+                    .modify(|r, w| w.bits(r.bits() & !HFPCLKPLL));
             }
 
             // Set divider to 0 (divide by 2)
