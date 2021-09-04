@@ -18,8 +18,8 @@ struct SerialWrapper(Tx<UART0>);
 impl fmt::Write for SerialWrapper {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for byte in s.as_bytes() {
-            if *byte == '\n' as u8 {
-                let res = block!(self.0.write('\r' as u8));
+            if *byte == b'\n' {
+                let res = block!(self.0.write(b'\r'));
 
                 if res.is_err() {
                     return Err(::core::fmt::Error);

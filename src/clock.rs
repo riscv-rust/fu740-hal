@@ -43,10 +43,10 @@ impl PLLConfig {
         }
 
         let divq: u8 = match output {
-            f if f > 2400_000_000 => {
+            f if f > 2_400_000_000 => {
                 return Err("Requested PLL output frequency is too high");
             }
-            f if f >= 1200_000_000 => 1,
+            f if f >= 1_200_000_000 => 1,
             f if f >= 600_000_000 => 2,
             f if f >= 300_000_000 => 3,
             f if f >= 150_000_000 => 4,
@@ -61,7 +61,7 @@ impl PLLConfig {
         let divr = (0..3)
             .min_by_key(|divr| {
                 let pllin = input / (divr + 1);
-                if pllin < 7_000_000 || pllin >= 200_000_000 {
+                if !(7_000_000..200_000_000).contains(&pllin) {
                     i64::MAX
                 } else {
                     let f1 = vco / (2 * pllin as u64);
