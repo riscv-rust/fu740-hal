@@ -189,7 +189,9 @@ impl ClockSetup {
                 while self.prci.core_pllcfg.read().plllock().bit_is_clear() {}
 
                 // Select corepll
-                self.prci.corepllsel.modify(|r, w| w.bits(r.bits() & !DVFSCOREPLL_SOURCE));
+                self.prci
+                    .corepllsel
+                    .modify(|r, w| w.bits(r.bits() & !DVFSCOREPLL_SOURCE));
             }
 
             if coreclk != HFXCLK {
@@ -200,7 +202,9 @@ impl ClockSetup {
             }
 
             // Switch peripheral clock to HFXCLK
-            self.prci.hfpclkpllsel.modify(|r, w| w.bits(r.bits() | HFPCLKPLL));
+            self.prci
+                .hfpclkpllsel
+                .modify(|r, w| w.bits(r.bits() | HFPCLKPLL));
 
             // Apply PLL configuration
             self.prci.hfpclk_pllcfg.write_with_zero(|w| {
@@ -224,7 +228,9 @@ impl ClockSetup {
 
             if pclk != HFXCLK / 2 {
                 // Select PLL as a peripheral clock source
-                self.prci.hfpclkpllsel.modify(|r, w| w.bits(r.bits() & !HFPCLKPLL));
+                self.prci
+                    .hfpclkpllsel
+                    .modify(|r, w| w.bits(r.bits() & !HFPCLKPLL));
             }
 
             // Set divider to 0 (divide by 2)

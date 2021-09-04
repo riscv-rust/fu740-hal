@@ -66,4 +66,3 @@ impl From<MegaHertz> for KiloHertz {
         Self(mhz.0 * 1_000)
     }
 }
-
