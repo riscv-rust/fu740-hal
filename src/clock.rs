@@ -1,4 +1,8 @@
-use crate::{pac::PRCI, time::Hertz};
+use crate::{
+    pac::PRCI,
+    time::Hertz,
+    error::{Error, Result},
+};
 
 const HFXCLK: u32 = 26_000_000;
 
@@ -25,7 +29,7 @@ struct PllConfig {
 }
 
 impl PllConfig {
-    fn calculate(input: u32, output: u32) -> Result<PllConfig, &'static str> {
+    fn calculate(input: u32, output: u32) -> Result<PllConfig> {
         if input == output {
             return Ok(PllConfig {
                 r: 0,
@@ -38,7 +42,7 @@ impl PllConfig {
 
         let divq: u8 = match output {
             f if f > 2_400_000_000 => {
-                return Err("Requested PLL output frequency is too high");
+                return Err(Error::PllOutputFrequencyTooHigh);
             }
             f if f >= 1_200_000_000 => 1,
             f if f >= 600_000_000 => 2,
@@ -47,7 +51,7 @@ impl PllConfig {
             f if f >= 75_000_000 => 5,
             f if f >= 37_500_000 => 6,
             _ => {
-                return Err("Requested PLL output frequency is too low");
+                return Err(Error::PllOutputFrequencyTooLow);
             }
         };
         let vco = (output as u64) << divq;
@@ -63,13 +67,13 @@ impl PllConfig {
                     ((vco1 as i64) - (vco as i64)).abs()
                 }
             })
-            .unwrap();
+            .unwrap_or_else(|| unreachable!());
         let pllin = input / (divr + 1);
         let divf = (vco / (2 * pllin as u64) - 1) as u16;
 
         let range = match pllin {
             f if f < 7_000_000 => {
-                return Err("Invalid PLL input frequency");
+                return Err(Error::PllInputFrequencyTooLow);
             }
             f if f < 11_000_000 => 1,
             f if f < 18_000_000 => 2,
@@ -79,7 +83,7 @@ impl PllConfig {
             f if f < 130_000_000 => 6,
             f if f < 200_000_000 => 7,
             _ => {
-                return Err("Invalid PLL input frequency");
+                return Err(Error::PllInputFrequencyTooHigh);
             }
         };
 
@@ -125,12 +129,12 @@ impl ClockSetup {
         self
     }
 
-    pub fn freeze(self) -> Clocks {
+    pub fn freeze(self) -> Result<Clocks> {
         let coreclk = self.coreclk.unwrap_or(HFXCLK);
         let pclk = self.pclk.unwrap_or(HFXCLK / 2);
 
-        let core_pll = PllConfig::calculate(HFXCLK, coreclk).unwrap();
-        let hfpclk_pll = PllConfig::calculate(HFXCLK, pclk * 2).unwrap();
+        let core_pll = PllConfig::calculate(HFXCLK, coreclk)?;
+        let hfpclk_pll = PllConfig::calculate(HFXCLK, pclk * 2)?;
 
         unsafe {
             // Switch core clock to HFXCLK
@@ -193,10 +197,10 @@ impl ClockSetup {
             self.prci.hfpclk_div_reg.write_with_zero(|w| w.bits(0));
         }
 
-        Clocks {
+        Ok(Clocks {
             coreclk: core_pll.output_frequency(HFXCLK),
             pclk: hfpclk_pll.output_frequency(HFXCLK) / 2,
-        }
+        })
     }
 }
 
