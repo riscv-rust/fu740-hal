@@ -1,7 +1,12 @@
-use crate::pac::PRCI;
-use crate::time::Hertz;
+use crate::{
+    pac::{prci::hfxosccfg::HFXOSCEN_R, PRCI},
+    time::Hertz,
+};
 
 const HFXCLK: u32 = 26_000_000;
+const HFXCLK_SOURCE: u32 = 1;
+const DVFSCOREPLL_SOURCE: u32 = 1;
+const HFPCLKPLL: u32 = 1;
 
 pub trait PrciExt {
     fn setup(self) -> ClockSetup;
@@ -103,6 +108,30 @@ impl PLLConfig {
     }
 }
 
+struct HfxclkGuard<'g> {
+    ref_prci: &'g PRCI,
+    prior_hfxclkoscen: HFXOSCEN_R,
+}
+
+impl<'g> HfxclkGuard<'g> {
+    pub fn new(ref_prci: &'g PRCI) -> Self {
+        Self {
+            ref_prci,
+            prior_hfxclkoscen: ref_prci.hfxosccfg.read().hfxoscen(),
+        }
+    }
+}
+
+impl<'g> Drop for HfxclkGuard<'g> {
+    fn drop(&mut self) {
+        if self.prior_hfxclkoscen.bit_is_clear() {
+            self.ref_prci
+                .hfxosccfg
+                .modify(|_, w| w.hfxoscen().clear_bit())
+        }
+    }
+}
+
 pub struct ClockSetup {
     prci: PRCI,
     coreclk: Option<u32>,
@@ -112,7 +141,7 @@ pub struct ClockSetup {
 impl ClockSetup {
     pub fn coreclk<F: Into<Hertz>>(mut self, freq: F) -> Self {
         let freq = freq.into().0;
-        assert!(freq < 1600_000_000);
+        assert!(freq < 1_600_000_000);
 
         self.coreclk = Some(freq);
         self
@@ -133,11 +162,17 @@ impl ClockSetup {
         let core_pll = PLLConfig::calculate(HFXCLK, coreclk).unwrap();
         let hfpclk_pll = PLLConfig::calculate(HFXCLK, pclk * 2).unwrap();
 
+        // Remember `hfxclk`'s current setting and restore on exit; enable, if necessary
+        let _guard = HfxclkGuard::new(&self.prci);
+        if self.prci.hfxosccfg.read().hfxoscen().bit_is_clear() {
+            self.prci.hfxosccfg.modify(|_, w| w.hfxoscen().set_bit());
+            while self.prci.hfxosccfg.read().hfxoscrdy().bit_is_clear() {}
+        }
         unsafe {
             // Switch core clock to HFXCLK
             self.prci
                 .core_clk_sel_reg
-                .modify(|r, w| w.bits(r.bits() | 1));
+                .modify(|r, w| w.bits(r.bits() | HFXCLK_SOURCE));
 
             // Apply PLL configuration
             self.prci.core_pllcfg.write_with_zero(|w| {
@@ -154,18 +189,18 @@ impl ClockSetup {
                 while self.prci.core_pllcfg.read().plllock().bit_is_clear() {}
 
                 // Select corepll
-                self.prci.corepllsel.modify(|r, w| w.bits(r.bits() & !1));
+                self.prci.corepllsel.modify(|r, w| w.bits(r.bits() & !DVFSCOREPLL_SOURCE));
             }
 
             if coreclk != HFXCLK {
                 // Select PLL as a core clock source
                 self.prci
                     .core_clk_sel_reg
-                    .modify(|r, w| w.bits(r.bits() & !1));
+                    .modify(|r, w| w.bits(r.bits() & !HFXCLK_SOURCE));
             }
 
             // Switch peripheral clock to HFXCLK
-            self.prci.hfpclkpllsel.modify(|r, w| w.bits(r.bits() | 1));
+            self.prci.hfpclkpllsel.modify(|r, w| w.bits(r.bits() | HFPCLKPLL));
 
             // Apply PLL configuration
             self.prci.hfpclk_pllcfg.write_with_zero(|w| {
@@ -189,7 +224,7 @@ impl ClockSetup {
 
             if pclk != HFXCLK / 2 {
                 // Select PLL as a peripheral clock source
-                self.prci.hfpclkpllsel.modify(|r, w| w.bits(r.bits() & !1));
+                self.prci.hfpclkpllsel.modify(|r, w| w.bits(r.bits() & !HFPCLKPLL));
             }
 
             // Set divider to 0 (divide by 2)
