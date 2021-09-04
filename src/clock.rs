@@ -1,7 +1,4 @@
-use crate::{
-    pac::{prci::hfxosccfg::HFXOSCEN_R, PRCI},
-    time::Hertz,
-};
+use crate::{pac::PRCI, time::Hertz};
 
 const HFXCLK: u32 = 26_000_000;
 const HFXCLK_SOURCE: u32 = 1;
@@ -108,30 +105,6 @@ impl PLLConfig {
     }
 }
 
-struct HfxclkGuard<'g> {
-    ref_prci: &'g PRCI,
-    prior_hfxclkoscen: HFXOSCEN_R,
-}
-
-impl<'g> HfxclkGuard<'g> {
-    pub fn new(ref_prci: &'g PRCI) -> Self {
-        Self {
-            ref_prci,
-            prior_hfxclkoscen: ref_prci.hfxosccfg.read().hfxoscen(),
-        }
-    }
-}
-
-impl<'g> Drop for HfxclkGuard<'g> {
-    fn drop(&mut self) {
-        if self.prior_hfxclkoscen.bit_is_clear() {
-            self.ref_prci
-                .hfxosccfg
-                .modify(|_, w| w.hfxoscen().clear_bit())
-        }
-    }
-}
-
 pub struct ClockSetup {
     prci: PRCI,
     coreclk: Option<u32>,
@@ -162,12 +135,6 @@ impl ClockSetup {
         let core_pll = PLLConfig::calculate(HFXCLK, coreclk).unwrap();
         let hfpclk_pll = PLLConfig::calculate(HFXCLK, pclk * 2).unwrap();
 
-        // Remember `hfxclk`'s current setting and restore on exit; enable, if necessary
-        let _guard = HfxclkGuard::new(&self.prci);
-        if self.prci.hfxosccfg.read().hfxoscen().bit_is_clear() {
-            self.prci.hfxosccfg.modify(|_, w| w.hfxoscen().set_bit());
-            while self.prci.hfxosccfg.read().hfxoscrdy().bit_is_clear() {}
-        }
         unsafe {
             // Switch core clock to HFXCLK
             self.prci
