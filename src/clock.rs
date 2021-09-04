@@ -1,9 +1,6 @@
 use crate::{pac::PRCI, time::Hertz};
 
 const HFXCLK: u32 = 26_000_000;
-const HFXCLK_SOURCE: u32 = 1;
-const DVFSCOREPLL_SOURCE: u32 = 1;
-const HFPCLKPLL: u32 = 1;
 
 pub trait PrciExt {
     fn setup(self) -> ClockSetup;
@@ -137,9 +134,7 @@ impl ClockSetup {
 
         unsafe {
             // Switch core clock to HFXCLK
-            self.prci
-                .core_clk_sel_reg
-                .modify(|r, w| w.bits(r.bits() | HFXCLK_SOURCE));
+            self.prci.core_clk_sel_reg.modify(|_, w| w.source().hfclk());
 
             // Apply PLL configuration
             self.prci.core_pllcfg.write_with_zero(|w| {
@@ -156,22 +151,18 @@ impl ClockSetup {
                 while self.prci.core_pllcfg.read().plllock().bit_is_clear() {}
 
                 // Select corepll
-                self.prci
-                    .corepllsel
-                    .modify(|r, w| w.bits(r.bits() & !DVFSCOREPLL_SOURCE));
+                self.prci.corepllsel.modify(|_, w| w.source().corepll());
             }
 
             if coreclk != HFXCLK {
                 // Select PLL as a core clock source
                 self.prci
                     .core_clk_sel_reg
-                    .modify(|r, w| w.bits(r.bits() & !HFXCLK_SOURCE));
+                    .modify(|_, w| w.source().pll_mux());
             }
 
             // Switch peripheral clock to HFXCLK
-            self.prci
-                .hfpclkpllsel
-                .modify(|r, w| w.bits(r.bits() | HFPCLKPLL));
+            self.prci.hfpclkpllsel.modify(|_, w| w.source().hfclk());
 
             // Apply PLL configuration
             self.prci.hfpclk_pllcfg.write_with_zero(|w| {
@@ -195,9 +186,7 @@ impl ClockSetup {
 
             if pclk != HFXCLK / 2 {
                 // Select PLL as a peripheral clock source
-                self.prci
-                    .hfpclkpllsel
-                    .modify(|r, w| w.bits(r.bits() & !HFPCLKPLL));
+                self.prci.hfpclkpllsel.modify(|_, w| w.source().hfpclkpll());
             }
 
             // Set divider to 0 (divide by 2)
