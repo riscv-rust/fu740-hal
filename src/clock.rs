@@ -1,7 +1,7 @@
 use crate::{
+    error::{Error, Result},
     pac::PRCI,
     time::Hertz,
-    error::{Error, Result},
 };
 
 const HFXCLK: u32 = 26_000_000;
