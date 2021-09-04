@@ -16,7 +16,7 @@ impl PrciExt for PRCI {
     }
 }
 
-struct PLLConfig {
+struct PllConfig {
     r: u8,
     f: u16,
     q: u8,
@@ -24,10 +24,10 @@ struct PLLConfig {
     bypass: bool,
 }
 
-impl PLLConfig {
-    fn calculate(input: u32, output: u32) -> Result<PLLConfig, &'static str> {
+impl PllConfig {
+    fn calculate(input: u32, output: u32) -> Result<PllConfig, &'static str> {
         if input == output {
-            return Ok(PLLConfig {
+            return Ok(PllConfig {
                 r: 0,
                 f: 0,
                 q: 0,
@@ -83,7 +83,7 @@ impl PLLConfig {
             }
         };
 
-        Ok(PLLConfig {
+        Ok(PllConfig {
             r: divr as u8,
             f: divf,
             q: divq,
@@ -129,8 +129,8 @@ impl ClockSetup {
         let coreclk = self.coreclk.unwrap_or(HFXCLK);
         let pclk = self.pclk.unwrap_or(HFXCLK / 2);
 
-        let core_pll = PLLConfig::calculate(HFXCLK, coreclk).unwrap();
-        let hfpclk_pll = PLLConfig::calculate(HFXCLK, pclk * 2).unwrap();
+        let core_pll = PllConfig::calculate(HFXCLK, coreclk).unwrap();
+        let hfpclk_pll = PllConfig::calculate(HFXCLK, pclk * 2).unwrap();
 
         unsafe {
             // Switch core clock to HFXCLK
