@@ -1,1 +1,1 @@
-pub mod msg;
+pub const DEFAULT_CONCAT_STR_BUFFER_SIZE_IN_BYTES: usize = 128;

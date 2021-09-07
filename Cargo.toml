@@ -11,3 +11,6 @@ fu740-pac = { git = "https://github.com/riscv-rust/fu740-pac.git", rev = "2ea5c4
 embedded-hal = { version = "0.2.3", features = ["unproven"] }
 nb = "0.1.2"
 riscv = "0.7.0"
+
+[dev-dependencies]
+assert2 = "0.3.6"

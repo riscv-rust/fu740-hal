@@ -1,5 +1,8 @@
+mod pll_config;
+
 use crate::{
-    error::{Error, Result},
+    clock::pll_config::PllConfig,
+    error::clock::{Error, Result},
     pac::PRCI,
     time::Hertz,
 };
@@ -20,92 +23,6 @@ impl PrciExt for PRCI {
     }
 }
 
-struct PllConfig {
-    r: u8,
-    f: u16,
-    q: u8,
-    range: u8,
-    bypass: bool,
-}
-
-impl PllConfig {
-    fn calculate(input: u32, output: u32) -> Result<PllConfig> {
-        if input == output {
-            return Ok(PllConfig {
-                r: 0,
-                f: 0,
-                q: 0,
-                range: 0,
-                bypass: true,
-            });
-        }
-
-        let divq: u8 = match output {
-            f if f > 2_400_000_000 => {
-                return Err(Error::PllOutputFrequencyTooHigh);
-            }
-            f if f >= 1_200_000_000 => 1,
-            f if f >= 600_000_000 => 2,
-            f if f >= 300_000_000 => 3,
-            f if f >= 150_000_000 => 4,
-            f if f >= 75_000_000 => 5,
-            f if f >= 37_500_000 => 6,
-            _ => {
-                return Err(Error::PllOutputFrequencyTooLow);
-            }
-        };
-        let vco = (output as u64) << divq;
-
-        let divr = (0..3)
-            .min_by_key(|divr| {
-                let pllin = input / (divr + 1);
-                if !(7_000_000..200_000_000).contains(&pllin) {
-                    i64::MAX
-                } else {
-                    let f1 = vco / (2 * pllin as u64);
-                    let vco1 = f1 * 2 * (pllin as u64);
-                    ((vco1 as i64) - (vco as i64)).abs()
-                }
-            })
-            .unwrap_or_else(|| unreachable!());
-        let pllin = input / (divr + 1);
-        let divf = (vco / (2 * pllin as u64) - 1) as u16;
-
-        let range = match pllin {
-            f if f < 7_000_000 => {
-                return Err(Error::PllInputFrequencyTooLow);
-            }
-            f if f < 11_000_000 => 1,
-            f if f < 18_000_000 => 2,
-            f if f < 30_000_000 => 3,
-            f if f < 50_000_000 => 4,
-            f if f < 80_000_000 => 5,
-            f if f < 130_000_000 => 6,
-            f if f < 200_000_000 => 7,
-            _ => {
-                return Err(Error::PllInputFrequencyTooHigh);
-            }
-        };
-
-        Ok(PllConfig {
-            r: divr as u8,
-            f: divf,
-            q: divq,
-            range,
-            bypass: false,
-        })
-    }
-
-    fn output_frequency(&self, input: u32) -> u32 {
-        if self.bypass {
-            input
-        } else {
-            let vco = (input as u64) * 2 * (self.f as u64 + 1) / (self.r as u64 + 1);
-            (vco >> self.q) as u32
-        }
-    }
-}
-
 pub struct ClockSetup {
     prci: PRCI,
     coreclk: Option<u32>,
@@ -121,6 +38,10 @@ impl ClockSetup {
         self
     }
 
+    pub fn freeze(self) -> Clocks {
+        self.try_freeze().unwrap()
+    }
+
     pub fn pclk<F: Into<Hertz>>(mut self, freq: F) -> Self {
         let freq = freq.into().0;
         assert!(freq < 125_000_000);
@@ -129,12 +50,12 @@ impl ClockSetup {
         self
     }
 
-    pub fn freeze(self) -> Result<Clocks> {
+    pub fn try_freeze(self) -> Result<Clocks> {
         let coreclk = self.coreclk.unwrap_or(HFXCLK);
         let pclk = self.pclk.unwrap_or(HFXCLK / 2);
 
-        let core_pll = PllConfig::calculate(HFXCLK, coreclk)?;
-        let hfpclk_pll = PllConfig::calculate(HFXCLK, pclk * 2)?;
+        let core_pll = PllConfig::calculate(HFXCLK, coreclk).map_err(Error::CorePllError)?;
+        let hfpclk_pll = PllConfig::calculate(HFXCLK, pclk * 2).map_err(Error::HfpClkPllError)?;
 
         unsafe {
             // Switch core clock to HFXCLK

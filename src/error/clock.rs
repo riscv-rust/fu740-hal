@@ -1,14 +1,14 @@
-pub mod clock;
+pub mod pll_config;
 
 use crate::{concat_str, consts::*};
 use core::fmt::{Display, Formatter, Result as FmtResult};
 
-#[allow(dead_code)]
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Error {
-    ClockError(clock::Error),
+    CorePllError(pll_config::Error),
+    HfpClkPllError(pll_config::Error),
 }
 
 impl Display for Error {
@@ -19,15 +19,11 @@ impl Display for Error {
             f,
             "{}",
             match self {
-                Error::ClockError(error) =>
-                    concat_str::show(&mut buf, format_args!("ClockError: {}", error))?,
+                Error::CorePllError(error) =>
+                    concat_str::show(&mut buf, format_args!("CorePllError: {}", error))?,
+                Error::HfpClkPllError(error) =>
+                    concat_str::show(&mut buf, format_args!("HfpClkPllError: {}", error))?,
             }
         )
-    }
-}
-
-impl From<clock::Error> for Error {
-    fn from(error: clock::Error) -> Self {
-        Self::ClockError(error)
     }
 }
