@@ -62,8 +62,8 @@ impl PllConfig {
                     let vco1 = f1 * 2 * (pllin as u64);
                     ((vco1 as i64) - (vco as i64)).abs()
                 }
-            })
-            .unwrap();
+            }).ok_or("Internal error: `min_by_key()` returned `None` from non-empty iterator")?;
+
         let pllin = input / (divr + 1);
         let divf = (vco / (2 * pllin as u64) - 1) as u16;
 
@@ -129,12 +129,12 @@ impl ClockSetup {
         let coreclk = self.coreclk.unwrap_or(HFXCLK);
         let pclk = self.pclk.unwrap_or(HFXCLK / 2);
 
-        let core_pll = PllConfig::calculate(HFXCLK, coreclk).unwrap();
-        let hfpclk_pll = PllConfig::calculate(HFXCLK, pclk * 2).unwrap();
+        let core_pll = PllConfig::calculate(HFXCLK, coreclk).expect("Invalid PLL input parameters");
+        let hfpclk_pll = PllConfig::calculate(HFXCLK, pclk * 2).expect("Invalid PLL input parameters");
 
-        unsafe {
             // Switch core clock to HFXCLK
             self.prci.core_clk_sel_reg.modify(|_, w| w.source().hfclk());
+        unsafe {
 
             // Apply PLL configuration
             self.prci.core_pllcfg.write_with_zero(|w| {
