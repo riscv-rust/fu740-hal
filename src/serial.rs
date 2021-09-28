@@ -40,22 +40,26 @@ impl<UART: UartX> Serial<UART> {
     pub fn new(uart: UART, baud_rate: Bps, clocks: &Clocks) -> Self {
         let div = clocks.pclk().0 / baud_rate.0 - 1;
         assert!(div <= 0xffff);
+        uart.ie.modify(|_, w| {
+            w.txwm().clear_bit();
+            w.rxwm().clear_bit()
+        });
         unsafe {
-            uart.ie.modify(|_, w| {
-                w.txwm().clear_bit();
-                w.rxwm().clear_bit()
-            });
             uart.div.write_with_zero(|w| w.bits(div));
-            uart.txctrl.modify(|_, w| {
-                w.txcnt().bits(1);
-                w.nstop().set_bit();
-                w.txen().set_bit()
-            });
-            uart.rxctrl.modify(|_, w| {
-                w.rxcnt().bits(0);
-                w.rxen().set_bit()
-            });
         }
+        uart.txctrl.modify(|_, w| {
+            unsafe {
+                w.txcnt().bits(1);
+            }
+            w.nstop().set_bit();
+            w.txen().set_bit()
+        });
+        uart.rxctrl.modify(|_, w| {
+            unsafe {
+                w.rxcnt().bits(0);
+            }
+            w.rxen().set_bit()
+        });
 
         Serial { uart }
     }

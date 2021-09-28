@@ -63,7 +63,8 @@ impl PllConfig {
                     ((vco1 as i64) - (vco as i64)).abs()
                 }
             })
-            .unwrap();
+            .ok_or("Internal error: `min_by_key()` returned `None` from non-empty iterator")?;
+
         let pllin = input / (divr + 1);
         let divf = (vco / (2 * pllin as u64) - 1) as u16;
 
@@ -129,14 +130,15 @@ impl ClockSetup {
         let coreclk = self.coreclk.unwrap_or(HFXCLK);
         let pclk = self.pclk.unwrap_or(HFXCLK / 2);
 
-        let core_pll = PllConfig::calculate(HFXCLK, coreclk).unwrap();
-        let hfpclk_pll = PllConfig::calculate(HFXCLK, pclk * 2).unwrap();
+        let core_pll = PllConfig::calculate(HFXCLK, coreclk).expect("Invalid PLL input parameters");
+        let hfpclk_pll =
+            PllConfig::calculate(HFXCLK, pclk * 2).expect("Invalid PLL input parameters");
 
+        // Switch core clock to HFXCLK
+        self.prci.core_clk_sel_reg.modify(|_, w| w.source().hfclk());
+
+        // Apply PLL configuration
         unsafe {
-            // Switch core clock to HFXCLK
-            self.prci.core_clk_sel_reg.modify(|_, w| w.source().hfclk());
-
-            // Apply PLL configuration
             self.prci.core_pllcfg.write_with_zero(|w| {
                 w.pllr().bits(core_pll.r);
                 w.pllf().bits(core_pll.f);
@@ -145,26 +147,28 @@ impl ClockSetup {
                 w.pllbypass().bit(core_pll.bypass);
                 w.pllfsebypass().set_bit()
             });
+        }
 
-            if !core_pll.bypass {
-                // Wait for lock
-                while self.prci.core_pllcfg.read().plllock().bit_is_clear() {}
+        if !core_pll.bypass {
+            // Wait for lock
+            while self.prci.core_pllcfg.read().plllock().bit_is_clear() {}
 
-                // Select corepll
-                self.prci.corepllsel.modify(|_, w| w.source().corepll());
-            }
+            // Select corepll
+            self.prci.corepllsel.modify(|_, w| w.source().corepll());
+        }
 
-            if coreclk != HFXCLK {
-                // Select PLL as a core clock source
-                self.prci
-                    .core_clk_sel_reg
-                    .modify(|_, w| w.source().pll_mux());
-            }
+        if coreclk != HFXCLK {
+            // Select PLL as a core clock source
+            self.prci
+                .core_clk_sel_reg
+                .modify(|_, w| w.source().pll_mux());
+        }
 
-            // Switch peripheral clock to HFXCLK
-            self.prci.hfpclkpllsel.modify(|_, w| w.source().hfclk());
+        // Switch peripheral clock to HFXCLK
+        self.prci.hfpclkpllsel.modify(|_, w| w.source().hfclk());
 
-            // Apply PLL configuration
+        // Apply PLL configuration
+        unsafe {
             self.prci.hfpclk_pllcfg.write_with_zero(|w| {
                 w.pllr().bits(hfpclk_pll.r);
                 w.pllf().bits(hfpclk_pll.f);
@@ -173,23 +177,25 @@ impl ClockSetup {
                 w.pllbypass().bit(hfpclk_pll.bypass);
                 w.pllfsebypass().set_bit()
             });
+        }
 
-            if !hfpclk_pll.bypass {
-                // Wait for lock
-                while self.prci.hfpclk_pllcfg.read().plllock().bit_is_clear() {}
-            }
+        if !hfpclk_pll.bypass {
+            // Wait for lock
+            while self.prci.hfpclk_pllcfg.read().plllock().bit_is_clear() {}
+        }
 
-            // Enable clock
-            self.prci
-                .hfpclk_plloutdiv
-                .modify(|r, w| w.bits(r.bits() | 1u32 << 31));
+        // Enable clock
+        self.prci
+            .hfpclk_plloutdiv
+            .modify(|r, w| unsafe { w.bits(r.bits() | 1u32 << 31) });
 
-            if pclk != HFXCLK / 2 {
-                // Select PLL as a peripheral clock source
-                self.prci.hfpclkpllsel.modify(|_, w| w.source().hfpclkpll());
-            }
+        if pclk != HFXCLK / 2 {
+            // Select PLL as a peripheral clock source
+            self.prci.hfpclkpllsel.modify(|_, w| w.source().hfpclkpll());
+        }
 
-            // Set divider to 0 (divide by 2)
+        // Set divider to 0 (divide by 2)
+        unsafe {
             self.prci.hfpclk_div_reg.write_with_zero(|w| w.bits(0));
         }
 
