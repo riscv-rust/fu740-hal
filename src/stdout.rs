@@ -1,10 +1,10 @@
 //! Stdout based on the UART hooked up to FTDI or J-Link
 
 use crate::{
-    clock::Clocks,
+    clocks::ClockFreqs,
     pac::UART0,
     serial::{Serial, Tx},
-    time::Bps,
+    freq::Bps,
 };
 use core::fmt::{self, Write};
 use embedded_hal::prelude::*;
@@ -37,7 +37,7 @@ impl fmt::Write for SerialWrapper {
 }
 
 /// Configures stdout
-pub fn configure(uart: UART0, baud_rate: Bps, clocks: &Clocks) {
+pub fn configure(uart: UART0, baud_rate: Bps, clocks: &ClockFreqs) {
     let serial = Serial::new(uart, baud_rate, clocks);
     let (tx, _) = serial.split();
 

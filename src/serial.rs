@@ -6,9 +6,9 @@ use core::mem;
 use embedded_hal::serial;
 use nb;
 
-use crate::clock::Clocks;
+use crate::clocks::ClockFreqs;
 use crate::pac::{UART0, UART1};
-use crate::time::Bps;
+use crate::freq::Bps;
 
 mod closed_traits {
     use crate::pac::uart0;
@@ -37,31 +37,32 @@ pub struct Tx<UART> {
 
 impl<UART: UartX> Serial<UART> {
     /// Configures a UART peripheral to provide serial communication
-    pub fn new(uart: UART, baud_rate: Bps, clocks: &Clocks) -> Self {
-        let div = clocks.pclk().0 / baud_rate.0 - 1;
-        assert!(div <= 0xffff);
-        uart.ie.modify(|_, w| {
-            w.txwm().clear_bit();
-            w.rxwm().clear_bit()
-        });
-        unsafe {
-            uart.div.write_with_zero(|w| w.bits(div));
-        }
-        uart.txctrl.modify(|_, w| {
-            unsafe {
-                w.txcnt().bits(1);
-            }
-            w.nstop().set_bit();
-            w.txen().set_bit()
-        });
-        uart.rxctrl.modify(|_, w| {
-            unsafe {
-                w.rxcnt().bits(0);
-            }
-            w.rxen().set_bit()
-        });
-
-        Serial { uart }
+    pub fn new(uart: UART, baud_rate: Bps, clocks: &ClockFreqs) -> Self {
+        // let div = clocks.hfpclk().as_checked_u32().unwrap() / baud_rate.as_checked_u32().unwrap() - 1;
+        // assert!(div <= 0xffff);
+        // uart.ie.modify(|_, w| {
+        //     w.txwm().clear_bit();
+        //     w.rxwm().clear_bit()
+        // });
+        // unsafe {
+        //     uart.div.write_with_zero(|w| w.bits(div));
+        // }
+        // uart.txctrl.modify(|_, w| {
+        //     unsafe {
+        //         w.txcnt().bits(1);
+        //     }
+        //     w.nstop().set_bit();
+        //     w.txen().set_bit()
+        // });
+        // uart.rxctrl.modify(|_, w| {
+        //     unsafe {
+        //         w.rxcnt().bits(0);
+        //     }
+        //     w.rxen().set_bit()
+        // });
+        //
+        // Serial { uart }
+        unimplemented!()
     }
 
     /// Starts listening for an interrupt event

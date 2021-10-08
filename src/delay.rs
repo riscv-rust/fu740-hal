@@ -1,4 +1,4 @@
-use crate::clock::Clocks;
+use crate::clocks::ClockFreqs;
 use embedded_hal::blocking::delay::{DelayMs, DelayUs};
 use riscv::register::mcycle;
 
@@ -10,10 +10,11 @@ pub struct McycleDelay {
 
 impl McycleDelay {
     /// Constructs the delay provider
-    pub fn new(clocks: &Clocks) -> Self {
-        Self {
-            core_frequency: clocks.coreclk().0,
-        }
+    pub fn new(clocks: &ClockFreqs) -> Self {
+        unimplemented!()
+        // Self {
+        //     core_frequency: clocks.coreclk().hz().as_checked_u32().unwrap(),
+        // }
     }
 }
 
