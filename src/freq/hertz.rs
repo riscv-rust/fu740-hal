@@ -1,5 +1,7 @@
 mod from_prim_int;
 mod prim_int_ext;
+#[cfg(test)]
+mod unit_tests;
 
 use crate::consts::*;
 use core::fmt::{Display, Formatter, Result as FmtResult};

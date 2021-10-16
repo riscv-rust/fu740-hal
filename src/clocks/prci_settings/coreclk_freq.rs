@@ -1,7 +1,6 @@
 use crate::{clocks::HFXCLK, freq::Hertz};
-use num_traits::PrimInt;
 
-pub trait Freq<I: PrimInt>: Default {
+pub trait Freq<I>: Default {
     const DEFAULT: I;
     const RANGE: (I, I);
 }

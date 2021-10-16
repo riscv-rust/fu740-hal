@@ -1,5 +1,8 @@
-use crate::{consts::*, Hertz};
+#[cfg(test)]
+mod unit_tests;
+
 use super::HertzInner;
+use crate::{consts::*, Hertz};
 
 // Create `const` (when supported, for compile-time range-checking) `From` conversions from primitive integer -> `Hertz`
 macro_rules! for_hertz {

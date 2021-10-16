@@ -8,7 +8,6 @@ pub mod prelude;
 pub mod serial;
 pub mod stdout;
 mod freq;
-pub mod traits;
 
 pub use {error::{Error, Result}, freq::Hertz};
 pub use fu740_pac as pac;
